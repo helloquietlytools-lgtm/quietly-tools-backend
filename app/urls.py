@@ -8,4 +8,6 @@ urlpatterns = [
     path('v1/api/register', RegisterAPI.as_view(), name='register'),
     path('v1/api/login', LoginAPI.as_view(), name='login'),
     path('v1/api/logout', LogOutAPI.as_view(), name='logout'),
+    path('v1/api/google/login', GoogleLoginAPIView.as_view(), name='google-login'),
+    path('v1/api/google/callback', GoogleCallbackAPIView.as_view(), name='google-callback'),
 ]

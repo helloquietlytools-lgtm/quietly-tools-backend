@@ -21,9 +21,19 @@ from .models import User
 from .serialization import *
 from django.conf import settings
 from rest_framework import viewsets
+from django.utils.crypto import get_random_string
 
 
 # Create your views here.
+def split_name(full_name: str):
+    parts = str(full_name).strip().split()
+    if len(parts) == 0:
+        return "", ""
+    elif len(parts) == 1:
+        return parts[0], ""
+    else:
+        return parts[0], " ".join(parts[1:])
+    
 def password_check(passwd):
     flag = 0
     import re
@@ -189,26 +199,19 @@ class GoogleCallbackAPIView(GenericAPIView):
 
         user = User.objects.filter(email=email).first()
         if not user:
+            first_name, last_name = split_name(user_info.get('name'))
             # If user does not exist, create a new user
             user = User.objects.create_user(
                 username=email,
                 email=email,
-                password=User.objects.make_random_password(),
-                name=user_info.get('name'),
-                is_verified=True
+                password=get_random_string(length=12),
+                first_name=first_name,
+                last_name=last_name
             )
-            token = AuthToken.objects.create(user)[1]
-            user_data = UserSerial(user).data
-            result = {
-                'token': token,
-                'google_signup': True,
-                **user_data
-            }
-        else:
-            token = AuthToken.objects.create(user)[1]
-            user_data = UserSerial(user).data
-            result = {
-                'token': token,
-                **user_data
-            }
+        token = AuthToken.objects.create(user)[1]
+        user_data = UserSerial(user).data
+        result = {
+            'token': token,
+            **user_data
+        }
         return JsonResponse(result, safe=False)
