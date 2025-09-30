@@ -22,6 +22,8 @@ from .serialization import *
 from django.conf import settings
 from rest_framework import viewsets
 from django.utils.crypto import get_random_string
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.views import APIView
 
 
 # Create your views here.
@@ -212,6 +214,83 @@ class GoogleCallbackAPIView(GenericAPIView):
         user_data = UserSerial(user).data
         result = {
             'token': token,
+            **user_data
+        }
+        return JsonResponse(result, safe=False)
+    
+class GitHubLoginAPIView(GenericAPIView):
+    """Return GitHub login URL with client_id"""
+    serializer_class = None
+    filter_backends = []
+
+    @swagger_auto_schema(tags=['Authentication'])
+    def get(self, request):
+        github_url = (
+            f"{settings.GITHUB_AUTH_URL}"
+            f"?client_id={settings.GITHUB_CLIENT_ID}"
+            f"&scope=read:user user:email"
+        )
+        return Response({"auth_url": github_url})
+
+
+class GitHubCallbackAPIView(GenericAPIView):
+    serializer_class = GitHubAuthSerializer
+
+    @swagger_auto_schema(tags=['Authentication'])
+    def post(self, request):
+        code = request.data.get("code")
+        if not code:
+            return Response({"error": "No code provided"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Step 1: Exchange code for GitHub access token
+        token_res = requests.post(
+            settings.GITHUB_TOKEN_URL,
+            headers={'Accept': 'application/json'},
+            data={
+                'client_id': settings.GITHUB_CLIENT_ID,
+                'client_secret': settings.GITHUB_CLIENT_SECRET,
+                'code': code,
+            }
+        )
+        token_json = token_res.json()
+        access_token = token_json.get("access_token")
+
+        if not access_token:
+            return Response({"error": "Failed to fetch GitHub access token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Step 2: Get user info from GitHub
+        user_res = requests.get(
+            settings.GITHUB_USER_URL,
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        user_info = user_res.json()
+
+
+        username = user_info.get("login")
+        email = user_info.get("email") or f"{username}@github.local"
+        name = user_info.get("name") or username
+        
+        if not username:
+            return Response({"error": "Username not found in GitHub response"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Step 3: Get or create user
+        user = User.objects.filter(email=email).first()
+        if not user:
+            first_name, last_name = split_name(name)
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=get_random_string(length=12),
+                first_name=first_name,
+                last_name=last_name
+            )
+
+        # Step 4: Create Knox token (same as Google login flow)
+        token = AuthToken.objects.create(user)[1]
+        user_data = UserSerial(user).data
+
+        result = {
+            "token": token,
             **user_data
         }
         return JsonResponse(result, safe=False)

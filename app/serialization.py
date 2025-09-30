@@ -46,3 +46,7 @@ class GoogleLoginURLSerializer(serializers.Serializer):
 class GoogleLoginSerializer(serializers.Serializer):
     access_token = serializers.CharField(required=True)
     is_mobile = serializers.BooleanField(default=False)
+
+class GitHubAuthSerializer(serializers.Serializer):
+    code = serializers.CharField()
+    state = serializers.CharField(required=False)
