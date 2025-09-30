@@ -22,7 +22,6 @@ from .serialization import *
 from django.conf import settings
 from rest_framework import viewsets
 from django.utils.crypto import get_random_string
-from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.views import APIView
 
 
