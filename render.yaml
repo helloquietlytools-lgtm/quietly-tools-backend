@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: quietly-proj
+    env: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+      python manage.py migrate
+    startCommand: gunicorn quietly_proj.asgi:application -k uvicorn.workers.UvicornWorker --bind=0.0.0.0:10000
+    envVars:
+      - key: DATABASE_URL
+        value: "postgresql://postgres:YOUR_URL_ENCODED_PASSWORD@db.eeycyxirrmodjaienwje.supabase.co:5432/postgres"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DJANGO_SETTINGS_MODULE
+        value: quietly_proj.settings
+      - key: WEB_CONCURRENCY
+        value: 4
