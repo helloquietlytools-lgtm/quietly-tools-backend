@@ -13,6 +13,7 @@ class RegisterSerialization(serializers.ModelSerializer):
             'email',
             'password',
             'country',
+            'source_known',
             'referral_source',
         ]
 
@@ -35,6 +36,7 @@ class UserSerial(serializers.ModelSerializer):
             'last_name',
             'email',
             'country',
+            'source_known',
             'referral_source',
             'is_active',
             'is_staff',

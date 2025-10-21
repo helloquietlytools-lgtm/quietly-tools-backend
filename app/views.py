@@ -60,6 +60,7 @@ class RegisterAPI(GenericAPIView):
         last_name = request.data.get('last_name')
         country = request.data.get('country')
         referral_source = request.data.get('referral_source')
+        source_known = request.data.get('source_known')
 
         if not email:
             return Response({'message': "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -85,6 +86,7 @@ class RegisterAPI(GenericAPIView):
             first_name=first_name,
             last_name=last_name,
             country=country,
+            source_known = source_known,
             referral_source=referral_source,
         )
 

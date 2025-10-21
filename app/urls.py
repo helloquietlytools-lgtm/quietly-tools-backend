@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 
 
 urlpatterns = [
+    # url for login
     path('', index, name='welcome'),
     path('v1/api/register', RegisterAPI.as_view(), name='register'),
     path('v1/api/login', LoginAPI.as_view(), name='login'),
