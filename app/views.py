@@ -218,13 +218,19 @@ class GoogleCallbackAPIView(GenericAPIView):
             **user_data
         }
         return JsonResponse(result, safe=False)
-    
+class EmptySerializer(serializers.Serializer):
+    pass 
 class GitHubLoginAPIView(GenericAPIView):
     """Return GitHub login URL with client_id"""
-    serializer_class = None
+    # serializer_class = None
+    serializer_class = EmptySerializer
     filter_backends = []
 
-    @swagger_auto_schema(tags=['Authentication'])
+    @swagger_auto_schema(
+        tags=['Authentication'],
+        request_body=None,   # ✅ ensures no body is expected
+        operation_description="Get GitHub OAuth login URL"
+    )
     def get(self, request):
         github_url = (
             f"{settings.GITHUB_AUTH_URL}"
