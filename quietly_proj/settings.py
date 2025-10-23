@@ -82,7 +82,7 @@ MIDDLEWARE = [
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",             # your Vite dev server
-    "https://quietly.tools/",  # your deployed React app
+    "https://quietly.tools"  # your deployed React app
 ]
 
 CORS_ALLOW_CREDENTIALS = True
