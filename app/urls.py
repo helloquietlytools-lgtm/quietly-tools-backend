@@ -16,4 +16,5 @@ urlpatterns = [
     path('v1/api/forgot-password', ForgotPasswordAPI.as_view(), name='forgot-password'),
     path('v1/api/reset-password/<uidb64>/<token>/', ResetPasswordAPI.as_view(), name='reset-password'),
     path('v1/api/test-email/', TestEmailAPI.as_view(), name='test-email'),
+    path("v1/api/verify-email/<uidb64>/<token>/", VerifyEmailAPI.as_view(), name="verify-email"),
 ]

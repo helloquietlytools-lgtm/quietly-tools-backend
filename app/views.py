@@ -95,9 +95,45 @@ class RegisterAPI(GenericAPIView):
             country=country,
             source_known = source_known,
             referral_source=referral_source,
+            is_active = False
         )
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        domain = getattr(settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "https://quietly.tools"))
+        domain = domain.rstrip("/")
+        verify_link = f"{domain}/verify-email/{uid}/{token}/"
+
+        # Render email
+        context = {"user": user, "verify_link": verify_link}
+        html_content = render_to_string("email/verify_email.html", context)
+        text_content = f"Please verify your email: {verify_link}"
+
+        msg = EmailMultiAlternatives("Verify Your Email", text_content, settings.DEFAULT_FROM_EMAIL, [email])
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        return Response({"message": "Registration successful! Please verify your email to activate your account."}, status=status.HTTP_201_CREATED)
 
         return Response(UserSerial(user).data, status=status.HTTP_201_CREATED)
+
+class VerifyEmailAPI(APIView):
+    def get(self, request, uidb64, token):
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+            return Response({"error": "Invalid verification link"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.is_active:
+            return Response({"message": "Email already verified!"}, status=status.HTTP_200_OK)
+
+        if default_token_generator.check_token(user, token):
+            user.is_active = True
+            user.save()
+            return Response({"message": "Email verified successfully! You can now log in."}, status=status.HTTP_200_OK)
+        else:
+            return Response({"error": "Verification link expired or invalid"}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginAPI(GenericAPIView):
     serializer_class = LoginSerialization
@@ -352,9 +388,14 @@ class ForgotPasswordAPI(APIView):
 
         msg = EmailMultiAlternatives("Reset Your Password", text_content, settings.DEFAULT_FROM_EMAIL, [email])
         msg.attach_alternative(html_content, "text/html")
-        msg.send()
+        try:
+            msg.send()
+            return Response({"message": "Password reset email sent successfully!"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            print("Email error:", e)
+            return Response({"error": str(e)}, status=500)
 
-        return Response({"message": "Password reset email sent successfully!"}, status=status.HTTP_200_OK)
+        
 
 
 class ResetPasswordAPI(APIView):
