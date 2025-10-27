@@ -340,7 +340,10 @@ class ForgotPasswordAPI(APIView):
         
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        reset_link = f"{request.scheme}://{request.get_host()}/v1/api/reset-password/{uid}/{token}/"
+        domain = getattr(settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "https://quietly.tools"))
+        domain = domain.rstrip("/")  # Remove trailing slash if any
+        reset_link = f"{domain}/reset-password/{uid}/{token}/"
+        # reset_link = f"{request.scheme}://{request.get_host()}/v1/api/reset-password/{uid}/{token}/"
 
         context = {'user': user, 'reset_link': reset_link}
         html_content = render_to_string('email/reset_password.html', context)
