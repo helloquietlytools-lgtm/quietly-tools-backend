@@ -2,6 +2,7 @@ from django.shortcuts import render
 import random
 import re
 import requests
+from drf_yasg import openapi    
 from django.http import JsonResponse
 from rest_framework import status, permissions
 from rest_framework.generics import GenericAPIView
@@ -23,6 +24,11 @@ from django.conf import settings
 from rest_framework import viewsets
 from django.utils.crypto import get_random_string
 from rest_framework.views import APIView
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
 
 
 # Create your views here.
@@ -301,3 +307,114 @@ class GitHubCallbackAPIView(GenericAPIView):
             **user_data
         }
         return JsonResponse(result, safe=False)
+    
+#forgot password view
+    
+class ForgotPasswordAPI(APIView):
+    @swagger_auto_schema(
+        operation_description="Send a password reset link to a user's email address.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email'],
+            properties={
+                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Registered user email address'),
+            },
+        ),
+        responses={
+            200: openapi.Response('Success', openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={'message': openapi.Schema(type=openapi.TYPE_STRING)}
+            )),
+            404: "User not found",
+        },
+    )
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({"error": "No account found with that email"}, status=status.HTTP_404_NOT_FOUND)
+        
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        reset_link = f"{request.scheme}://{request.get_host()}/v1/api/reset-password/{uid}/{token}/"
+
+        context = {'user': user, 'reset_link': reset_link}
+        html_content = render_to_string('emails/reset_password.html', context)
+        text_content = f"Reset your password using this link: {reset_link}"
+
+        msg = EmailMultiAlternatives("Reset Your Password", text_content, settings.DEFAULT_FROM_EMAIL, [email])
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+
+        return Response({"message": "Password reset email sent successfully!"}, status=status.HTTP_200_OK)
+
+
+class ResetPasswordAPI(APIView):
+    @swagger_auto_schema(
+        operation_description="Reset user password using the tokenized link received via email.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['password'],
+            properties={
+                'password': openapi.Schema(type=openapi.TYPE_STRING, description='New password'),
+            },
+        ),
+        responses={
+            200: openapi.Response('Password reset successful'),
+            400: "Invalid token or request",
+        },
+    )
+    def post(self, request, uidb64, token):
+        password = request.data.get('password')
+        if not password:
+            return Response({"error": "Password is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({"error": "Invalid link"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not default_token_generator.check_token(user, token):
+            return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(password)
+        user.save()
+        return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
+    
+class TestEmailAPI(APIView):
+    """
+    Send a test email to verify email configuration.
+    """
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Email context
+        context = {
+            'user': {'first_name': 'Tester'},
+            'message': 'This is a test email to verify your email configuration.',
+        }
+
+        # Load HTML template (optional)
+        html_content = render_to_string('email/test_email.html', context)
+        text_content = "This is a test email to verify your email configuration."
+
+        try:
+            msg = EmailMultiAlternatives(
+                subject="Test Email from Your Django App",
+                body=text_content,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[email],
+            )
+            msg.attach_alternative(html_content, "text/html")
+            msg.send()
+            return Response({"message": f"Test email sent successfully to {email}"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

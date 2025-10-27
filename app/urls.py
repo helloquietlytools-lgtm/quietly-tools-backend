@@ -13,4 +13,7 @@ urlpatterns = [
     path('v1/api/google/callback', GoogleCallbackAPIView.as_view(), name='google-callback'),
     path('v1/api/github/login/', GitHubLoginAPIView.as_view(), name='github-login'),
     path('v1/api/github/callback/', GitHubCallbackAPIView.as_view(), name='github-callback'),
+    path('v1/api/forgot-password', ForgotPasswordAPI.as_view(), name='forgot-password'),
+    path('v1/api/reset-password/<uidb64>/<token>/', ResetPasswordAPI.as_view(), name='reset-password'),
+    path('v1/api/test-email/', TestEmailAPI.as_view(), name='test-email'),
 ]
