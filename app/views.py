@@ -343,7 +343,7 @@ class ForgotPasswordAPI(APIView):
         reset_link = f"{request.scheme}://{request.get_host()}/v1/api/reset-password/{uid}/{token}/"
 
         context = {'user': user, 'reset_link': reset_link}
-        html_content = render_to_string('emails/reset_password.html', context)
+        html_content = render_to_string('email/reset_password.html', context)
         text_content = f"Reset your password using this link: {reset_link}"
 
         msg = EmailMultiAlternatives("Reset Your Password", text_content, settings.DEFAULT_FROM_EMAIL, [email])
