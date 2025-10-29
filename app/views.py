@@ -436,47 +436,13 @@ class ResetPasswordAPI(APIView):
         user.save()
         return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
 # @method_decorator(csrf_exempt, name='dispatch')
-class TestEmailAPI(APIView):
+class TestEmailAPI(GenericAPIView):
     """
     Send a test email using GoDaddy SMTP.
     """
+    serializer_class = TestEmailSerialization
 
-    @swagger_auto_schema(
-        tags=['Email'],
-        operation_description="Send a test email to verify SMTP configuration (GoDaddy).",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=['email'],
-            properties={
-                'email': openapi.Schema(
-                    type=openapi.TYPE_STRING,
-                    format=openapi.FORMAT_EMAIL,
-                    description='Recipient email address to send the test email to.'
-                )
-            }
-        ),
-        responses={
-            200: openapi.Response(
-                description="Email sent successfully.",
-                examples={
-                    "application/json": {"message": "✅ Email sent successfully to example@example.com"}
-                },
-            ),
-            400: openapi.Response(
-                description="Missing email field.",
-                examples={
-                    "application/json": {"error": "Email is required"}
-                },
-            ),
-            500: openapi.Response(
-                description="SMTP or sending error.",
-                examples={
-                    "application/json": {"error": "SMTPAuthenticationError: Authentication failed"}
-                },
-            ),
-        }
-    )
-    @csrf_exempt
+    @swagger_auto_schema(tags=['Authentication'])
     def post(self, request):
         recipient_email = request.data.get('email')
         if not recipient_email:

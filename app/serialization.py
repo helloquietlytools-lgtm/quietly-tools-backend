@@ -52,3 +52,9 @@ class GoogleLoginSerializer(serializers.Serializer):
 class GitHubAuthSerializer(serializers.Serializer):
     code = serializers.CharField()
     state = serializers.CharField(required=False)
+
+
+
+class TestEmailSerialization(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
