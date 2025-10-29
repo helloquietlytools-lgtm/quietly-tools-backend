@@ -2,6 +2,8 @@ from django.shortcuts import render
 import random
 import re
 import requests
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from drf_yasg import openapi    
 from django.http import JsonResponse
 from rest_framework import status, permissions
@@ -11,6 +13,9 @@ from knox.models import AuthToken
 from knox.auth import TokenAuthentication
 import random
 import re
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from django.http import JsonResponse
 from rest_framework import status, permissions
 from rest_framework.generics import GenericAPIView
@@ -430,45 +435,67 @@ class ResetPasswordAPI(APIView):
         user.set_password(password)
         user.save()
         return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
-    
+@method_decorator(csrf_exempt, name='dispatch')
 class TestEmailAPI(APIView):
     """
-    Send a test email to verify email configuration.
+    Send a test email using GoDaddy SMTP.
     """
 
+    @swagger_auto_schema(
+        tags=['Email'],
+        operation_description="Send a test email to verify SMTP configuration (GoDaddy).",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format=openapi.FORMAT_EMAIL,
+                    description='Recipient email address to send the test email to.'
+                )
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Email sent successfully.",
+                examples={
+                    "application/json": {"message": "✅ Email sent successfully to example@example.com"}
+                },
+            ),
+            400: openapi.Response(
+                description="Missing email field.",
+                examples={
+                    "application/json": {"error": "Email is required"}
+                },
+            ),
+            500: openapi.Response(
+                description="SMTP or sending error.",
+                examples={
+                    "application/json": {"error": "SMTPAuthenticationError: Authentication failed"}
+                },
+            ),
+        }
+    )
+    @csrf_exempt
     def post(self, request):
-        email = request.data.get('email')
-        if not email:
+        recipient_email = request.data.get('email')
+        if not recipient_email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Email context
-        context = {
-            'user': {'first_name': 'Tester'},
-            'message': 'This is a test email to verify your GoDaddy email configuration.',
-        }
+        sender_email = settings.EMAIL_HOST_USER
+        password = settings.EMAIL_HOST_PASSWORD  # ⚠️ Store this securely in environment variables!
 
-        # Load HTML template (optional)
-        html_content = render_to_string('email/test_email.html', context)
-        text_content = "This is a test email to verify your GoDaddy email configuration."
+        msg = MIMEMultipart()
+        msg["From"] = f"Queitly <{sender_email}>"
+        msg["To"] = recipient_email
+        msg["Subject"] = "✅ Test Email"
+        msg.attach(MIMEText("<h3>This is a test email from Queitly SMTP setup.</h3>", "html"))
 
         try:
-            msg = EmailMultiAlternatives(
-                subject="✅ Test Email from Your Django App (GoDaddy SMTP)",
-                body=text_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[email],
-            )
-            msg.attach_alternative(html_content, "text/html")
-            msg.send(fail_silently=False)
+            with smtplib.SMTP_SSL("smtpout.secureserver.net", 465) as server:
+                server.login(sender_email, password)
+                server.sendmail(sender_email, recipient_email, msg.as_string())
 
-            return Response(
-                {"message": f"Test email sent successfully to {email}"},
-                status=status.HTTP_200_OK
-            )
-
+            return Response({"message": f"✅ Email sent successfully to {recipient_email}"})
         except Exception as e:
-            # logger.error(f"Email sending failed: {str(e)}")
-            return Response(
-                {"error": f"Email sending failed: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
