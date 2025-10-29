@@ -200,14 +200,15 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # settings.py
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
+EMAIL_HOST = 'smtpout.secureserver.net'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True       # ✅ GoDaddy requires SSL on port 465
+EMAIL_USE_TLS = False      # ⚠️ Do NOT enable both
 EMAIL_TIMEOUT = 10
-EMAIL_HOST_USER = 'helloquietlytools@gmail.com'
-EMAIL_HOST_PASSWORD = 'iqpc pcju dhds trpk'  # from Step 1
+EMAIL_HOST_USER = 'hello@quietly.tools'    # <-- use your full GoDaddy email
+EMAIL_HOST_PASSWORD = 'h4#e7ofie7'  # <-- your real GoDaddy mailbox password
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 
 
 # Default primary key field type
