@@ -451,15 +451,15 @@ class TestEmailAPI(APIView):
         html_content = render_to_string('email/test_email.html', context)
         text_content = "This is a test email to verify your email configuration."
 
-        try:
-            msg = EmailMultiAlternatives(
-                subject="Test Email from Your Django App",
-                body=text_content,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[email],
-            )
-            msg.attach_alternative(html_content, "text/html")
-            msg.send()
-            return Response({"message": f"Test email sent successfully to {email}"}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # try:
+        msg = EmailMultiAlternatives(
+            subject="Test Email from Your Django App",
+            body=text_content,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[email],
+        )
+        msg.attach_alternative(html_content, "text/html")
+        msg.send()
+        return Response({"message": f"Test email sent successfully to {email}"}, status=status.HTTP_200_OK)
+        # except Exception as e:
+        #     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
