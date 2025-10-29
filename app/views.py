@@ -435,7 +435,7 @@ class ResetPasswordAPI(APIView):
         user.set_password(password)
         user.save()
         return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
-@method_decorator(csrf_exempt, name='dispatch')
+# @method_decorator(csrf_exempt, name='dispatch')
 class TestEmailAPI(APIView):
     """
     Send a test email using GoDaddy SMTP.
@@ -482,8 +482,8 @@ class TestEmailAPI(APIView):
         if not recipient_email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        sender_email = settings.EMAIL_HOST_USER
-        password = settings.EMAIL_HOST_PASSWORD  # ⚠️ Store this securely in environment variables!
+        sender_email = "hello@quietly.tools"
+        password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
 
         msg = MIMEMultipart()
         msg["From"] = f"Queitly <{sender_email}>"
