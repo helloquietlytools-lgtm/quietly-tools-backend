@@ -461,13 +461,25 @@ class TestEmailAPI(GenericAPIView):
                 logger.info(f"Email settings - Host: {settings.EMAIL_HOST}, Port: {settings.EMAIL_PORT}")
                 logger.info(f"From email: {settings.EMAIL_HOST_USER}")
                 
-                send_mail(
-                    subject='Test from Django',
-                    message='Testing GoDaddy email integration.',
-                    from_email='hello@quietly.tools',
-                    recipient_list=[recipient_email],
-                    fail_silently=False,
-                )
+                # send_mail(
+                #     subject='Test from Django',
+                #     message='Testing GoDaddy email integration.',
+                #     from_email='hello@quietly.tools',
+                #     recipient_list=[recipient_email],
+                #     fail_silently=False,
+                # )
+                sender_email = "hello@quietly.tools"
+                password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
+
+                msg = MIMEMultipart()
+                msg["From"] = f"Queitly <{sender_email}>"
+                msg["To"] = recipient_email
+                msg["Subject"] = "✅ Test Email"
+                msg.attach(MIMEText("<h3>This is a test email from Queitly SMTP setup.</h3>", "html"))
+
+                with smtplib.SMTP_SSL("smtpout.secureserver.net", 465) as server:
+                    server.login(sender_email, password)
+                    server.sendmail(sender_email, recipient_email, msg.as_string())
                 logger.info(f"✅ Email sent successfully to {recipient_email}")
             except Exception as e:
                 logger.error(f"❌ Email sending failed: {str(e)}", exc_info=True)
@@ -478,19 +490,3 @@ class TestEmailAPI(GenericAPIView):
             {"message": f"✅ Email is being sent to {recipient_email}"},
             status=status.HTTP_200_OK
         )
-        # sender_email = "hello@quietly.tools"
-        # password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
-
-        # msg = MIMEMultipart()
-        # msg["From"] = f"Queitly <{sender_email}>"
-        # msg["To"] = recipient_email
-        # msg["Subject"] = "✅ Test Email"
-        # msg.attach(MIMEText("<h3>This is a test email from Queitly SMTP setup.</h3>", "html"))
-        # try:
-        #     with smtplib.SMTP_SSL("smtpout.secureserver.net", 465) as server:
-        #         server.login(sender_email, password)
-        #         server.sendmail(sender_email, recipient_email, msg.as_string())
-
-        #     return Response({"message": f"✅ Email sent successfully to {recipient_email}"})
-        # except Exception as e:
-        #     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
