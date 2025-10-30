@@ -232,7 +232,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 GOOGLE_CLIENT_ID = os.getenv('CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-GOOGLE_REDIRECT_URI = os.getenv('FRONTEND_URL') + '/auth/callback'
+GOOGLE_REDIRECT_URI = str(os.getenv('FRONTEND_URL')) + '/auth/callback'
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://quietly.tools")
 GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT')
@@ -240,3 +240,16 @@ GITHUB_CLIENT_SECRET = os.getenv('GITHUB_SECRET')
 GITHUB_AUTH_URL = "https://github.com/login/oauth/authorize"
 GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 GITHUB_USER_URL = "https://api.github.com/user"
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
