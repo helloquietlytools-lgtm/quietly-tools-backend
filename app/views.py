@@ -36,6 +36,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 import os
 from django.core.mail import send_mail
+import threading
 
 # Create your views here.
 def split_name(full_name: str):
@@ -448,14 +449,21 @@ class TestEmailAPI(GenericAPIView):
         if not recipient_email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        send_mail(
-            subject='Test from Django',
-            message='Testing GoDaddy email integration.',
-            from_email='hello@quietly.tools',
-            recipient_list=[recipient_email],  # Use your test email
-            fail_silently=False,
-        )
-        return Response({"message": f"✅ Email sent successfully to {recipient_email}"})
+        def send_email():
+            try:
+                send_mail(
+                    subject='Test from Django',
+                    message='Testing GoDaddy email integration.',
+                    from_email='hello@quietly.tools',
+                    recipient_list=[recipient_email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                print(f"Email error: {e}")
+        
+        threading.Thread(target=send_email, daemon=True).start()
+        
+        return Response({"message": f"✅ Email queued for {recipient_email}"})
 
         # sender_email = "hello@quietly.tools"
         # password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
