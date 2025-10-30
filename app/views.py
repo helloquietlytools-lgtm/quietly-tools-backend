@@ -35,7 +35,7 @@ from django.utils.encoding import force_bytes
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 import os
-
+from django.core.mail import send_mail
 
 # Create your views here.
 def split_name(full_name: str):
@@ -448,20 +448,28 @@ class TestEmailAPI(GenericAPIView):
         if not recipient_email:
             return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        sender_email = "hello@quietly.tools"
-        password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
+        send_mail(
+            subject='Test from Django',
+            message='Testing GoDaddy email integration.',
+            from_email='hello@quietly.tools',
+            recipient_list=[recipient_email],  # Use your test email
+            fail_silently=False,
+        )
+        return Response({"message": f"✅ Email sent successfully to {recipient_email}"})
 
-        msg = MIMEMultipart()
-        msg["From"] = f"Queitly <{sender_email}>"
-        msg["To"] = recipient_email
-        msg["Subject"] = "✅ Test Email"
-        msg.attach(MIMEText("<h3>This is a test email from Queitly SMTP setup.</h3>", "html"))
+        # sender_email = "hello@quietly.tools"
+        # password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
 
-        try:
-            with smtplib.SMTP_SSL("smtpout.secureserver.net", 465) as server:
-                server.login(sender_email, password)
-                server.sendmail(sender_email, recipient_email, msg.as_string())
+        # msg = MIMEMultipart()
+        # msg["From"] = f"Queitly <{sender_email}>"
+        # msg["To"] = recipient_email
+        # msg["Subject"] = "✅ Test Email"
+        # msg.attach(MIMEText("<h3>This is a test email from Queitly SMTP setup.</h3>", "html"))
+        # try:
+        #     with smtplib.SMTP_SSL("smtpout.secureserver.net", 465) as server:
+        #         server.login(sender_email, password)
+        #         server.sendmail(sender_email, recipient_email, msg.as_string())
 
-            return Response({"message": f"✅ Email sent successfully to {recipient_email}"})
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        #     return Response({"message": f"✅ Email sent successfully to {recipient_email}"})
+        # except Exception as e:
+        #     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
