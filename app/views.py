@@ -36,8 +36,10 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 import os
 from django.core.mail import send_mail
-import threading
+from asgiref.sync import sync_to_async
+import logging, threading
 
+logger = logging.getLogger(__name__)
 # Create your views here.
 def split_name(full_name: str):
     parts = str(full_name).strip().split()
@@ -437,6 +439,7 @@ class ResetPasswordAPI(APIView):
         user.save()
         return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
 # @method_decorator(csrf_exempt, name='dispatch')
+
 class TestEmailAPI(GenericAPIView):
     """
     Send a test email using GoDaddy SMTP.
@@ -447,10 +450,17 @@ class TestEmailAPI(GenericAPIView):
     def post(self, request):
         recipient_email = request.data.get('email')
         if not recipient_email:
-            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Email is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         def send_email():
             try:
+                logger.info(f"Attempting to send email to {recipient_email}")
+                logger.info(f"Email settings - Host: {settings.EMAIL_HOST}, Port: {settings.EMAIL_PORT}")
+                logger.info(f"From email: {settings.EMAIL_HOST_USER}")
+                
                 send_mail(
                     subject='Test from Django',
                     message='Testing GoDaddy email integration.',
@@ -458,13 +468,16 @@ class TestEmailAPI(GenericAPIView):
                     recipient_list=[recipient_email],
                     fail_silently=False,
                 )
+                logger.info(f"✅ Email sent successfully to {recipient_email}")
             except Exception as e:
-                print(f"Email error: {e}")
+                logger.error(f"❌ Email sending failed: {str(e)}", exc_info=True)
         
         threading.Thread(target=send_email, daemon=True).start()
         
-        return Response({"message": f"✅ Email queued for {recipient_email}"})
-
+        return Response(
+            {"message": f"✅ Email is being sent to {recipient_email}"},
+            status=status.HTTP_200_OK
+        )
         # sender_email = "hello@quietly.tools"
         # password = "h4#e7ofie7"  # ⚠️ Store this securely in environment variables!
 
