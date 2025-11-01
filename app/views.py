@@ -34,6 +34,8 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 import os
 from django.core.mail import send_mail
 from asgiref.sync import sync_to_async
@@ -439,42 +441,76 @@ class ResetPasswordAPI(APIView):
         user.save()
         return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
 # @method_decorator(csrf_exempt, name='dispatch')
-
-class TestEmailAPI(GenericAPIView):
+class TestEmailAPI(APIView):
     """
-    Send a test email using GoDaddy SMTP.
+    Send a test email using SendGrid API.
     """
-    serializer_class = TestEmailSerialization
 
-    @swagger_auto_schema(tags=['Authentication'])
+    @swagger_auto_schema(
+        tags=['Email'],
+        operation_description="Send a test email using SendGrid to verify configuration.",
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=['email'],
+            properties={
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    format=openapi.FORMAT_EMAIL,
+                    description='Recipient email address to send the test email to.'
+                )
+            }
+        ),
+        responses={
+            200: openapi.Response(
+                description="Email sent successfully.",
+                examples={
+                    "application/json": {"message": "✅ Email sent successfully to example@example.com"}
+                },
+            ),
+            400: openapi.Response(
+                description="Missing email field.",
+                examples={
+                    "application/json": {"error": "Email is required"}
+                },
+            ),
+            500: openapi.Response(
+                description="SendGrid API or sending error.",
+                examples={
+                    "application/json": {"error": "SendGridException: Invalid API key"}
+                },
+            ),
+        }
+    )
+    @csrf_exempt
     def post(self, request):
         recipient_email = request.data.get('email')
         if not recipient_email:
-            return Response(
-                {"error": "Email is required"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        def send_email():
-            try:
-                logger.info(f"Attempting to send email to {recipient_email}")
-                logger.info(f"Email settings - Host: {settings.EMAIL_HOST}, Port: {settings.EMAIL_PORT}")
-                logger.info(f"From email: {settings.EMAIL_HOST_USER}")
-                
-                send_mail(
-                    subject='Test from Django',
-                    message='Testing GoDaddy email integration.',
-                    from_email='hello@quietly.tools',
-                    recipient_list=[recipient_email],
-                    fail_silently=False,
-                )
-                logger.info(f"✅ Email sent successfully to {recipient_email}")
-            except Exception as e:
-                logger.error(f"❌ Email sending failed: {str(e)}", exc_info=True)
-        
-        threading.Thread(target=send_email, daemon=True).start()
-        
-        return Response(
-            {"message": f"✅ Email is being sent to {recipient_email}"},
-            status=status.HTTP_200_OK
+        sender_email = "hello@quietly.tools"  # This must be verified in your SendGrid account
+        api_key = os.getenv("SENDGRID_API_KEY")
+
+        if not api_key:
+            return Response({"error": "Missing SENDGRID_API_KEY in environment"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        message = Mail(
+            from_email=f"Quietly <{sender_email}>",
+            to_emails=recipient_email,
+            subject="✅ Test Email via SendGrid",
+            html_content="""
+                <div style="font-family:Arial, sans-serif;">
+                    <h3>🚀 SendGrid Test Email</h3>
+                    <p>This is a test email sent from <b>Quietly</b> using SendGrid API.</p>
+                </div>
+            """
         )
+
+        try:
+            sg = SendGridAPIClient(api_key)
+            response = sg.send(message)
+            return Response({
+                "message": f"✅ Email sent successfully to {recipient_email}",
+                "status_code": response.status_code
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
