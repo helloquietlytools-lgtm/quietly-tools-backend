@@ -12,6 +12,8 @@ from rest_framework.response import Response
 from knox.models import AuthToken
 from knox.auth import TokenAuthentication
 import random
+from django.utils.encoding import force_str
+
 import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
