@@ -451,7 +451,7 @@ class TestEmailAPI(APIView):
         operation_description="Send a test email using SendGrid to verify configuration.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['email'],
+            required=['email'],     
             properties={
                 'email': openapi.Schema(
                     type=openapi.TYPE_STRING,
