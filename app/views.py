@@ -187,6 +187,9 @@ class LoginAPI(GenericAPIView):
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             return Response({'message': "User does not exist!"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user.is_active:
+            return Response({"message": "Please verify your email before login with yur password."}, status=status.HTTP_403_FORBIDDEN)
 
         if user.check_password(password):
             token = AuthToken.objects.create(user)[1]  # Knox token
