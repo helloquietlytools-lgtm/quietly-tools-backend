@@ -113,18 +113,43 @@ class RegisterAPI(GenericAPIView):
         domain = domain.rstrip("/")
         verify_link = f"{domain}/verify-email/{uid}/{token}/"
 
-        # Render email
+        # Render email template
         context = {"user": user, "verify_link": verify_link}
         html_content = render_to_string("email/verify_email.html", context)
         text_content = f"Please verify your email: {verify_link}"
 
-        msg = EmailMultiAlternatives("Verify Your Email", text_content, settings.DEFAULT_FROM_EMAIL, [email])
-        msg.attach_alternative(html_content, "text/html")
-        msg.send()
+        # Prepare SendGrid email
+        sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "admin@quietly.tools")
+        sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
 
-        return Response({"message": "Registration successful! Please verify your email to activate your account."}, status=status.HTTP_201_CREATED)
+        if not sendgrid_api_key:
+            return Response({"error": "SendGrid API key not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response(UserSerial(user).data, status=status.HTTP_201_CREATED)
+        message = Mail(
+            from_email=f"Quietly Tools <{sender_email}>",
+            to_emails=user.email,
+            subject="✅ Verify Your Email - Quietly Tools",
+            plain_text_content=text_content,
+            html_content=html_content,
+        )
+
+        # Send via SendGrid
+        try:
+            sg = SendGridAPIClient(sendgrid_api_key)
+            response = sg.send(message)
+            if response.status_code in [200, 202]:
+                return Response(
+                    {"message": "Registration successful! Please verify your email to activate your account."},
+                    status=status.HTTP_201_CREATED
+                )
+            else:
+                return Response(
+                    {"error": f"SendGrid failed with status {response.status_code}", "details": response.body.decode()},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        except Exception as e:
+            print("SendGrid Error:", str(e))
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VerifyEmailAPI(APIView):
     def get(self, request, uidb64, token):
@@ -356,23 +381,39 @@ class GitHubCallbackAPIView(GenericAPIView):
         return JsonResponse(result, safe=False)
     
 #forgot password view
-    
 class ForgotPasswordAPI(APIView):
     @swagger_auto_schema(
-        operation_description="Send a password reset link to a user's email address.",
+        tags=['Authentication'],
+        operation_description="Send a password reset link to a user's registered email address using SendGrid.",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
             required=['email'],
             properties={
-                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Registered user email address'),
+                'email': openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description='Registered user email address'
+                ),
             },
         ),
         responses={
-            200: openapi.Response('Success', openapi.Schema(
-                type=openapi.TYPE_OBJECT,
-                properties={'message': openapi.Schema(type=openapi.TYPE_STRING)}
-            )),
-            404: "User not found",
+            200: openapi.Response(
+                description='Password reset email sent successfully.',
+                examples={
+                    "application/json": {"message": "Password reset email sent successfully!"}
+                }
+            ),
+            404: openapi.Response(
+                description='User not found.',
+                examples={
+                    "application/json": {"error": "No account found with that email"}
+                }
+            ),
+            500: openapi.Response(
+                description='SendGrid error.',
+                examples={
+                    "application/json": {"error": "SendGridException: Invalid API key"}
+                }
+            ),
         },
     )
     def post(self, request):
@@ -385,27 +426,47 @@ class ForgotPasswordAPI(APIView):
         except User.DoesNotExist:
             return Response({"error": "No account found with that email"}, status=status.HTTP_404_NOT_FOUND)
         
+        # Generate token & reset link
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         domain = getattr(settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "https://quietly.tools"))
-        domain = domain.rstrip("/")  # Remove trailing slash if any
+        domain = domain.rstrip("/")  # ensure no trailing slash
         reset_link = f"{domain}/reset-password/{uid}/{token}/"
-        # reset_link = f"{request.scheme}://{request.get_host()}/v1/api/reset-password/{uid}/{token}/"
 
-        context = {'user': user, 'reset_link': reset_link}
-        html_content = render_to_string('email/reset_password.html', context)
+        # Prepare email content
+        context = {"user": user, "reset_link": reset_link}
+        html_content = render_to_string("email/reset_password.html", context)
         text_content = f"Reset your password using this link: {reset_link}"
 
-        msg = EmailMultiAlternatives("Reset Your Password", text_content, settings.DEFAULT_FROM_EMAIL, [email])
-        msg.attach_alternative(html_content, "text/html")
-        try:
-            msg.send()
-            return Response({"message": "Password reset email sent successfully!"}, status=status.HTTP_200_OK)
-        except Exception as e:
-            print("Email error:", e)
-            return Response({"error": str(e)}, status=500)
+        sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "admin@quietly.tools")
+        sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
 
-        
+        if not sendgrid_api_key:
+            return Response({"error": "SendGrid API key not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Create SendGrid mail
+        message = Mail(
+            from_email=f"Quietly Tools <{sender_email}>",
+            to_emails=email,
+            subject="🔐 Reset Your Password - Quietly Tools",
+            plain_text_content=text_content,
+            html_content=html_content,
+        )
+
+        # Send mail using SendGrid
+        try:
+            sg = SendGridAPIClient(sendgrid_api_key)
+            response = sg.send(message)
+            if response.status_code in [200, 202]:
+                return Response({"message": "Password reset email sent successfully!"}, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "error": f"SendGrid failed with status {response.status_code}",
+                    "details": response.body.decode()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            print("SendGrid Error:", str(e))
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
 
 
 class ResetPasswordAPI(APIView):
