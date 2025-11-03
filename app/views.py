@@ -91,11 +91,11 @@ class RegisterAPI(GenericAPIView):
         if password:
             checkpoint = password_check(password)
             if checkpoint == 1:
-                return Response({'message': 'Password must contain at least one capital letter'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
             if checkpoint == 2:
-                return Response({'message': 'Password must contain at least one digit'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
             if checkpoint == 3:
-                return Response({'message': 'Password must contain at least one special character (@, $, #, &)'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Create user
         user = User.objects.create_user(
@@ -121,7 +121,7 @@ class RegisterAPI(GenericAPIView):
         text_content = f"Please verify your email: {verify_link}"
 
         # Prepare SendGrid email
-        sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "admin@quietly.tools")
+        sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "hello@quietly.tools")
         sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
 
         if not sendgrid_api_key:
@@ -443,7 +443,7 @@ class ForgotPasswordAPI(APIView):
         html_content = render_to_string("email/reset_password.html", context)
         text_content = f"Reset your password using this link: {reset_link}"
 
-        sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "admin@quietly.tools")
+        sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "hello@quietly.tools")
         sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
 
         if not sendgrid_api_key:
@@ -489,7 +489,8 @@ class ResetPasswordAPI(APIView):
             400: "Invalid token or request",
         },
     )
-    def post(self, request, uidb64, token):
+   def post(self, request, uidb64, token):
+       
         password = request.data.get('password')
         if not password:
             return Response({"error": "Password is required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -503,9 +504,21 @@ class ResetPasswordAPI(APIView):
         if not default_token_generator.check_token(user, token):
             return Response({"error": "Invalid or expired token"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ✅ Check if the new password matches the old password
+        if user.check_password(password):
+            return Response(
+                {"error": "New password cannot be the same as the previous password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         user.set_password(password)
         user.save()
-        return Response({"message": "Password has been reset successfully!"}, status=status.HTTP_200_OK)
+
+        return Response(
+            {"message": "Password has been reset successfully!"},
+            status=status.HTTP_200_OK
+        )
+
 # @method_decorator(csrf_exempt, name='dispatch')
 class TestEmailAPI(APIView):
     """
