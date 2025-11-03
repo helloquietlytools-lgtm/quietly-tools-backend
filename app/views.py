@@ -489,7 +489,7 @@ class ResetPasswordAPI(APIView):
             400: "Invalid token or request",
         },
     )
-   def post(self, request, uidb64, token):
+    def post(self, request, uidb64, token):
        
         password = request.data.get('password')
         if not password:
