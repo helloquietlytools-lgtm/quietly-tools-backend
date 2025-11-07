@@ -301,6 +301,7 @@ class LoginAPI(GenericAPIView):
                 'last_name': user.last_name,
                 'email': user.email,
                 'country': user.country,
+                'is_completed':user.profile_completed
             }
             result = {'token': token, **user_data}
             return JsonResponse({'status': 'Success', 'message': 'You have signed in successfully!', 'data': result}, safe=False)
