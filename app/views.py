@@ -13,7 +13,7 @@ from knox.models import AuthToken
 from knox.auth import TokenAuthentication
 import random
 from django.utils.encoding import force_str
-
+from rest_framework.permissions import IsAuthenticated
 import re
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -68,6 +68,91 @@ def password_check(passwd):
 def index(request):
     return JsonResponse({"Message": "Welcome to the Quietly Project"})
 
+# class RegisterAPI(GenericAPIView):
+#     serializer_class = RegisterSerialization
+
+#     @swagger_auto_schema(tags=['Authentication'])
+#     def post(self, request, *args, **kwargs):
+#         email = request.data.get('email')
+#         password = request.data.get('password')
+#         first_name = request.data.get('first_name')
+#         last_name = request.data.get('last_name')
+#         country = request.data.get('country')
+#         referral_source = request.data.get('referral_source')
+#         source_known = request.data.get('source_known')
+
+#         if not email:
+#             return Response({'message': "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         if User.objects.filter(email=email).exists():
+#             return Response({'message': "User already exists with this email! Please login"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Password validation
+#         if password:
+#             checkpoint = password_check(password)
+#             if checkpoint == 1:
+#                 return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
+#             if checkpoint == 2:
+#                 return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
+#             if checkpoint == 3:
+#                 return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Create user
+#         user = User.objects.create_user(
+#             username=email,  # still required by AbstractUser
+#             email=email,
+#             password=password,
+#             first_name=first_name,
+#             last_name=last_name,
+#             country=country,
+#             source_known = source_known,
+#             referral_source=referral_source,
+#             is_active = False
+#         )
+#         uid = urlsafe_base64_encode(force_bytes(user.pk))
+#         token = default_token_generator.make_token(user)
+#         domain = getattr(settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "https://quietly.tools"))
+#         domain = domain.rstrip("/")
+#         verify_link = f"{domain}/verify-email/{uid}/{token}/"
+
+#         # Render email template
+#         context = {"user": user, "verify_link": verify_link}
+#         html_content = render_to_string("email/verify_email.html", context)
+#         text_content = f"Please verify your email: {verify_link}"
+
+#         # Prepare SendGrid email
+#         sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "hello@quietly.tools")
+#         sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
+
+#         if not sendgrid_api_key:
+#             return Response({"error": "SendGrid API key not configured."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#         message = Mail(
+#             from_email=f"Quietly Tools <{sender_email}>",
+#             to_emails=user.email,
+#             subject="✅ Verify Your Email - Quietly Tools",
+#             plain_text_content=text_content,
+#             html_content=html_content,
+#         )
+
+#         # Send via SendGrid
+#         try:
+#             sg = SendGridAPIClient(sendgrid_api_key)
+#             response = sg.send(message)
+#             if response.status_code in [200, 202]:
+#                 return Response(
+#                     {"message": "Registration successful! Please verify your email to activate your account."},
+#                     status=status.HTTP_201_CREATED
+#                 )
+#             else:
+#                 return Response(
+#                     {"error": f"SendGrid failed with status {response.status_code}", "details": response.body.decode()},
+#                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#                 )
+#         except Exception as e:
+#             print("SendGrid Error:", str(e))
+#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 class RegisterAPI(GenericAPIView):
     serializer_class = RegisterSerialization
 
@@ -75,52 +160,39 @@ class RegisterAPI(GenericAPIView):
     def post(self, request, *args, **kwargs):
         email = request.data.get('email')
         password = request.data.get('password')
-        first_name = request.data.get('first_name')
-        last_name = request.data.get('last_name')
-        country = request.data.get('country')
-        referral_source = request.data.get('referral_source')
-        source_known = request.data.get('source_known')
 
         if not email:
             return Response({'message': "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+        if not password:
+            return Response({'message': "Password is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(email=email).exists():
             return Response({'message': "User already exists with this email! Please login"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Password validation
-        if password:
-            checkpoint = password_check(password)
-            if checkpoint == 1:
-                return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
-            if checkpoint == 2:
-                return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
-            if checkpoint == 3:
-                return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
+        checkpoint = password_check(password)
+        if checkpoint in [1, 2, 3]:
+            return Response({'message': 'Need Strong Password'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Create user
+        # Create inactive user
         user = User.objects.create_user(
-            username=email,  # still required by AbstractUser
+            username=email,
             email=email,
             password=password,
-            first_name=first_name,
-            last_name=last_name,
-            country=country,
-            source_known = source_known,
-            referral_source=referral_source,
-            is_active = False
+            is_active=False
         )
+
+        # Generate email verification link
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
-        domain = getattr(settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "https://quietly.tools"))
-        domain = domain.rstrip("/")
+        domain = getattr(settings, "FRONTEND_URL", os.getenv("FRONTEND_URL", "https://quietly.tools")).rstrip("/")
         verify_link = f"{domain}/verify-email/{uid}/{token}/"
 
-        # Render email template
+        # Send email
         context = {"user": user, "verify_link": verify_link}
         html_content = render_to_string("email/verify_email.html", context)
         text_content = f"Please verify your email: {verify_link}"
 
-        # Prepare SendGrid email
         sender_email = getattr(settings, "DEFAULT_FROM_EMAIL", "hello@quietly.tools")
         sendgrid_api_key = os.getenv("SENDGRID_API_KEY")
 
@@ -135,7 +207,6 @@ class RegisterAPI(GenericAPIView):
             html_content=html_content,
         )
 
-        # Send via SendGrid
         try:
             sg = SendGridAPIClient(sendgrid_api_key)
             response = sg.send(message)
@@ -152,6 +223,37 @@ class RegisterAPI(GenericAPIView):
         except Exception as e:
             print("SendGrid Error:", str(e))
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class CompleteProfileAPI(GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CommpleteProfileSerialization
+    @swagger_auto_schema(tags=['Authentication'])
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        if not user.is_active:
+            return Response({"message": "Email not verified yet!"}, status=status.HTTP_403_FORBIDDEN)
+
+        first_name = request.data.get('first_name')
+        last_name = request.data.get('last_name')
+        country = request.data.get('country')
+        referral_source = request.data.get('referral_source')
+        source_known = request.data.get('source_known')
+
+        # Validate required fields (optional)
+        if not first_name or not last_name:
+            return Response({"message": "First name and last name are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update user
+        user.first_name = first_name
+        user.last_name = last_name
+        user.country = country
+        user.referral_source = referral_source
+        user.source_known = source_known
+        user.profile_completed = True  # Optional flag
+        user.save()
+
+        return Response({"message": "Profile completed successfully!"}, status=status.HTTP_200_OK)
 
 class VerifyEmailAPI(APIView):
     def get(self, request, uidb64, token):

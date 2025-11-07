@@ -8,14 +8,23 @@ class RegisterSerialization(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'first_name',
-            'last_name',
             'email',
-            'password',
+            'password'
+        ]
+
+class CommpleteProfileSerialization(serializers.ModelSerializer):
+    # password = serializers.CharField(write_only=True, required=True)  
+
+    class Meta:
+        model = User
+        fields = [
+           'first_name',
+            'last_name',
             'country',
             'source_known',
             'referral_source',
         ]
+
 
 
 class LoginSerialization(serializers.Serializer):

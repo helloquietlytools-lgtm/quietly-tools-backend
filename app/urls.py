@@ -7,6 +7,7 @@ urlpatterns = [
     # url for login
     path('', index, name='welcome'),
     path('v1/api/register', RegisterAPI.as_view(), name='register'),
+    path('v1/api/complete_profile', CompleteProfileAPI.as_view(), name='complete_profile'),
     path('v1/api/login', LoginAPI.as_view(), name='login'),
     path('v1/api/logout', LogOutAPI.as_view(), name='logout'),
     path('v1/api/google/login', GoogleLoginAPIView.as_view(), name='google-login'),

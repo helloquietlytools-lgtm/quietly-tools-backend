@@ -28,5 +28,6 @@ class User(AbstractUser):
     country = models.CharField(max_length=100, null=True, blank=True)
     referral_source = models.CharField(max_length=50, null=True, blank=True)
     source_known = models.CharField(max_length=500, null=True, blank=True)
+    profile_completed = models.BooleanField(default=False)
     def __str__(self):
         return self.email
