@@ -6,6 +6,7 @@ import  os, re, logging
 import requests
 from django.db import transaction
 from django.db.models import Sum
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from drf_yasg import openapi    
@@ -51,6 +52,7 @@ from asgiref.sync import sync_to_async
 import logging, threading
 
 logger = logging.getLogger(__name__)
+QUIETLY_TZ = ZoneInfo(getattr(settings, "QUIETLY_TZ", "Asia/Kolkata"))
 # Create your views here.
 def split_name(full_name: str):
     parts = str(full_name).strip().split()
