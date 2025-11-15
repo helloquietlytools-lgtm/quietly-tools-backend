@@ -4,6 +4,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 import  os, re, logging
 import requests
+from random import sample
 from django.db import transaction
 from django.db.models import Sum
 from django.utils import timezone
@@ -926,23 +927,28 @@ class XPHistoryAPI(GenericAPIView):
 # ----------------- leaderboard (Option B) -----------------
 class LeaderboardAPI(GenericAPIView):
     permission_classes = [IsAuthenticated]
+
     @swagger_auto_schema(tags=['Leaderboard'])
     def get(self, request):
-        # window=14 for XP14
         today = _local_day(timezone.now())
         start = today - timedelta(days=13)
 
-        # aggregate xp14 for all users
-        xp_sums = (DailyXP.objects
-                   .filter(day__gte=start, day__lte=today)
-                   .values("user_id")
-                   .annotate(xp14=Sum("final_total_xp"),
-                             streak14=Sum("streak_xp")))
+        xp_sums = (
+            DailyXP.objects
+            .filter(day__gte=start, day__lte=today)
+            .values("user_id")
+            .annotate(xp14=Sum("final_total_xp"), streak14=Sum("streak_xp"))
+        )
         sums_map = {r["user_id"]: (r["xp14"] or 0, r["streak14"] or 0) for r in xp_sums}
-
-        # build champion rows for active users only (have at least one row in 14d)
         user_ids = list(sums_map.keys())
-        users = User.objects.filter(id__in=user_ids).only("id", "first_name", "last_name")
+
+        # ✅ Pull all users in last 14 days
+        users = list(User.objects.filter(id__in=user_ids).only("id", "first_name", "last_name"))
+
+        # ✅ Randomly sample up to 50 users (for leaderboard display)
+        if len(users) > 50:
+            users = sample(users, 50)
+
         champions = []
         for u in users:
             xp14, streak_sum = sums_map[u.id]
@@ -950,7 +956,6 @@ class LeaderboardAPI(GenericAPIView):
             rs = _rankscore(xp14, streak_sum)
             division = _division(streak, xp14)
 
-            # heatmap for last 14d
             days = DailyXP.objects.filter(user=u, day__gte=start, day__lte=today).order_by("day")
             heat = [{"date": row.day, "qualified": (row.streak_xp > 0)} for row in days]
 
@@ -961,7 +966,7 @@ class LeaderboardAPI(GenericAPIView):
                 "xp14": xp14,
                 "rankScore": rs,
                 "division": division,
-                "position": 0,  # set later by sort
+                "position": 0,
                 "heatmap": heat,
             })
 
@@ -970,10 +975,8 @@ class LeaderboardAPI(GenericAPIView):
         for i, c in enumerate(champions, 1):
             c["position"] = i
 
-        # "you" card
         me = next((c for c in champions if c["id"] == request.user.id), None)
         if not me:
-            # user has no rows in 14d; still return a minimal "you"
             streak = getattr(getattr(request.user, "streak", None), "current", 0)
             me = {
                 "id": request.user.id,
@@ -982,12 +985,10 @@ class LeaderboardAPI(GenericAPIView):
                 "xp14": 0,
                 "rankScore": _rankscore(0, 0),
                 "division": _division(streak, 0),
-                "position": len(champions)+1,
+                "position": len(champions) + 1,
                 "heatmap": [],
             }
 
-        # enrich “you” with Option B extras
-        # today_xp + tool_breakdown + next_milestone
         today_row = DailyXP.objects.filter(user=request.user, day=today).first()
         tool_breakdown = {
             "pomodoro": getattr(today_row, "pomodoro_xp", 0) if today_row else 0,
@@ -996,6 +997,7 @@ class LeaderboardAPI(GenericAPIView):
             "circular": getattr(today_row, "circular_xp", 0) if today_row else 0,
             "soul": getattr(today_row, "soul_xp", 0) if today_row else 0,
         }
+
         me_rich = dict(me)
         me_rich.update({
             "next_milestone": _next_milestone(me["streak"]),
