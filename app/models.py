@@ -135,4 +135,25 @@ class VaultlessDomain(models.Model):
 
     class Meta:
         constraints = [UniqueConstraint(fields=["user", "local_day", "fingerprint"], name="uq_vaultless_domain_day_once")]
+        
+class OAuthToken(models.Model):
+    PROVIDERS = [
+        ("gdrive", "Google Drive"),
+        ("github", "GitHub"),
+        ("dropbox", "Dropbox"),
+        ("box", "Box"),
+        ("onedrive", "OneDrive"),
+        ("medium", "Medium"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    provider = models.CharField(max_length=20, choices=PROVIDERS)
+    access_token = models.TextField()
+    refresh_token = models.TextField(blank=True, null=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "provider")
 

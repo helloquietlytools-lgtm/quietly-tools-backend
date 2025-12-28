@@ -30,4 +30,7 @@ urlpatterns = [
     path("v1/api/xp/today",   XPTodayAPI.as_view(), name="xp-today"),
     path("v1/api/xp/history", XPHistoryAPI.as_view(), name="xp-history"),
     path("v1/api/leaderboard", LeaderboardAPI.as_view(), name="xp-leaderboard"),
+    path("api/export/<str:provider>/", ExportView.as_view()),
+    path("api/auth/<str:provider>/", OAuthStartView.as_view()),
+    path("api/auth/<str:provider>/callback/", OAuthCallbackView.as_view()),
 ]

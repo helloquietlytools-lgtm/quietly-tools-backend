@@ -4,8 +4,11 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 import  os, re, logging
 import requests
+from django.shortcuts import redirect
+import urllib.parse
 from random import sample
 from django.db import transaction
+from django.utils.timezone import now, timedelta
 from django.db.models import Sum
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -52,6 +55,10 @@ from django.core.mail import send_mail
 from asgiref.sync import sync_to_async
 import logging, threading
 
+from .models import OAuthToken
+from .services import (
+    google, github, medium
+)
 logger = logging.getLogger(__name__)
 QUIETLY_TZ = ZoneInfo(getattr(settings, "QUIETLY_TZ", "Asia/Kolkata"))
 # Create your views here.
@@ -1008,3 +1015,92 @@ class LeaderboardAPI(GenericAPIView):
         payload = {"you": me_rich, "champions": champions}
         return Response(LeaderboardResponseSerializer(payload).data, status=200)
 
+
+class ExportView(APIView):
+    # permission_classes = [IsAuthenticated]
+
+    def post(self, request, provider):
+        title = request.data.get("title")
+        markdown = request.data.get("markdown")
+        html = request.data.get("html")
+
+        try:
+            token = OAuthToken.objects.get(
+                user=request.user,
+                provider=provider
+            )
+        except OAuthToken.DoesNotExist:
+            return Response({
+                "connected": False,
+                "connect_url": f"/api/auth/{provider}/"
+            }, status=401)
+
+        if provider == "gdrive":
+            google.upload(token, title, html)
+
+        elif provider == "github":
+            github.upload(token, title, markdown)
+
+        # elif provider == "dropbox":
+        #     dropbox.upload(token, title, markdown)
+
+        # elif provider == "box":
+        #     box.upload(token, title, markdown)
+
+        # elif provider == "onedrive":
+        #     onedrive.upload(token, title, markdown)
+
+        elif provider == "medium":
+            medium.publish(token, title, markdown)
+
+        else:
+            return Response({"error": "Invalid provider"}, status=400)
+
+        return Response({"success": True})
+
+
+class OAuthStartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, provider):
+        if provider == "gdrive":
+            params = {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                "response_type": "code",
+                "scope": "https://www.googleapis.com/auth/drive.file",
+                "access_type": "offline",
+                "prompt": "consent",
+                "state": request.user.id,
+            }
+            url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+            return redirect(url)
+        
+class OAuthCallbackView(APIView):
+    def get(self, request, provider):
+        code = request.GET.get("code")
+        user_id = request.GET.get("state")
+
+        if provider == "gdrive":
+            token_res = requests.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "redirect_uri": settings.GOOGLE_REDIRECT_URI,
+                    "grant_type": "authorization_code",
+                },
+            ).json()
+
+            OAuthToken.objects.update_or_create(
+                user_id=user_id,
+                provider="gdrive",
+                defaults={
+                    "access_token": token_res["access_token"],
+                    "refresh_token": token_res.get("refresh_token"),
+                    "expires_at": now() + timedelta(seconds=token_res["expires_in"]),
+                }
+            )
+
+        return redirect(settings.FRONTEND_URL)
